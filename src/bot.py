@@ -22,8 +22,6 @@ async def disapprove(ctx):
         "command": "disapprove"
     }
 
-    print(json.dumps(text))
-
     await ctx.respond("Thank you for your feedback.")
 
 

@@ -6,8 +6,9 @@ from urllib.request import Request, urlopen
 import tkinter as tk
 from PIL import ImageTk, Image, ImageDraw
 
-class WebImage:
+# TODO(josh): Better commenting.
 
+class WebImage:
     def __init__(self, width, height):
         self.width = width
         self.height = height
@@ -30,7 +31,6 @@ class WebImage:
         return self.image
 
 class Overlay:
-
     def __init__(self, width, height, y=0, padding=0):
         self.root = tk.Tk()
         self.root.title("NPC Discord Overlay")
@@ -58,7 +58,9 @@ class Overlay:
             self.root.attributes("-alpha", 0)
 
         return
-
+    
+    # TODO(josh): Rewrite _update and _get_input functions for multi-threaded
+    #               Queues instead and better function calling.
     def _update(self, text, img):
         """ Update the contents of the label and schedule fade-out effect. """
         self.label.configure(
@@ -73,7 +75,7 @@ class Overlay:
     def _get_input(self):
         """ Get JSON input from stdin and update the contents of the label. """
         while True:
-            msg = json.loads(input())
+            # msg = json.loads(input())
             text = f"{ msg['name'] } { msg['command'] }"
             img = self.img.get(msg["img_link"])
 
