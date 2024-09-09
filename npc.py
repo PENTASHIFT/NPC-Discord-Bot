@@ -1,8 +1,8 @@
+import io
 import os
-import json
 import threading
 import urllib.request
-from queue import Queue
+import queue
 
 import discord
 from discord.ext import commands
@@ -11,24 +11,39 @@ import tkinter as tk
 from dotenv import load_dotenv
 from PIL import ImageTk, Image, ImageDraw
 
+load_dotenv()   # FIXME(josh): Testing only!
 
 # TODO(josh): Join all these disparate commands into one or two function.
 class Commands(commands.Cog):
-    def __init__(self, bot, tqueue: Queue):
+    guilds = [os.environ.get("guild_id")]   # FIXME(josh): Testing only!
+
+    def __init__(self, bot, tqueue: queue.Queue):
         self.bot = bot
         self.tqueue = tqueue
 
-    @slash_command(name = "disapprove", description = "Express your disapproval.")
+    async def _cmd_handler(self, ctx):
+        img_url = ctx.author.avatar.url
+        author_name = ctx.author.display_name
+        overlay_msg = f"{ author_name } { ctx.command }s."
+
+        print(overlay_msg)
+        self.tqueue.put({
+            "img_url": img_url,
+            "overlay_msg": overlay_msg
+        })
+
+    @slash_command(guild_ids = guilds, name = "approve", description = "Express your approval.")
+    async def approve(self, ctx):
+        await self._cmd_handler(ctx)
+        await ctx.respond("Thank you for your feedback.")
+
+    @slash_command(guild_ids = guilds, name = "disapprove", description = "Express your approval.")
     async def disapprove(self, ctx):
-        print(ctx.command)
+        await self._cmd_handler(ctx)
         await ctx.respond("Thank you for your feedback.")
 
-    @slash_command(name = "approve", description = "Express your approval.")
-    async def approve(self, ctx):
-        await ctx.respond("Thank you for your feedback.")
-
-    @slash_command(name = "remember", description = "You will remember this.")
-    async def approve(self, ctx):
+    @slash_command(guild_ids = guilds, name = "remember", description = "You will remember this.")
+    async def remember(self, ctx):
         await ctx.respond("Thank you for your feedback.")
 
 class WebImage:
@@ -54,7 +69,9 @@ class WebImage:
         return self.image
 
 class Overlay:
-    def __init__(self, width, height, y=0, padding=0):
+    def __init__(self, tqueue: queue.Queue, width: int, height: int, y: int = 0, padding: int = 0):
+        self.tqueue = tqueue
+
         self.root = tk.Tk()
         self.root.title("NPC Discord Overlay")
 
@@ -67,16 +84,70 @@ class Overlay:
         self.root.wm_attributes("-transparentcolor", "gray")    # Set gray as transparent
         self.root.config(bg="gray")         # Make window transparent.
 
-        self.img = WebImage(48, 48)
-        self.label = None
+        self.web_img = WebImage(48, 48)
+        self.label = tk.Label(
+            self.root,
+            font = ("Georgia", 14),
+            fg = "white",
+            bg = "gray",
+            compound = "left",
+        )
+        self.label.pack(anchor = "e")
+
+    def _fade_out(self, increment: float) -> None:
+        alpha = self.root.attributes("-alpha")
+
+        if (alpha - increment) >= 0:
+            self.root.attributes("-alpha", alpha - increment)
+            self.root.after(100, self._fade_out, increment)
+        else:
+            self.root.attributes("-alpha", 0)
+
+        return
+
+    def _update(self, overlay_msg: str, img):
+        self.label.configure(
+            image = img,
+            text = f"   { overlay_msg }"
+        )
+
+        self.label.pack(anchor = "e")
+        self.root.attributes("-alpha", 1)
+        self.root.after(2000, self._fade_out, 0.05)
+    
+    def _loop(self):
+        while True:
+            try:
+                msg = self.tqueue.get(block=True, timeout=0.1)
+                img = self.web_img.get(msg["img_url"])
+                self._update(msg["overlay_msg"], img)
+            except queue.Empty:
+                break
+
+        self.root.after(100, self._loop)
+        
+    def run(self):
+        print("Now running overlay class!")
+
+        self.root.after(0, self._loop)
+        self.root.mainloop()
+
+
+def main(bot: discord.Bot, token: str):
+    bot.run(token)
 
 if __name__ == "__main__":
-    load_dotenv()
     token = os.environ.get("token")
 
-    tqueue = Queue()
+    tqueue = queue.Queue()
 
     bot = discord.Bot()
     bot.add_cog(Commands(bot, tqueue))
 
-    bot.run(token)
+    overlay = Overlay(tqueue, 512, 64, y=96, padding=64)
+    bot_thread = threading.Thread(target=main, args=(bot, token), daemon=True)
+    bot_thread.start()
+
+    # bot.run(token)
+
+    overlay.run()
