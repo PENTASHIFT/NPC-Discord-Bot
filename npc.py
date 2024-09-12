@@ -203,7 +203,7 @@ class Overlay:
         Updates the label defined in `__init__` to include the relevant user's
         avatar image already resized etc. and the relevant message.
 
-        :param overlay_msg: The message to be displayed on the overlay (i.e.,
+        :param overlay_msg: The message to be displayed on the overlay (e.g.,
             '<username> disapproves.')
         :param img: The user's avatar image after passed through `WebImage` and
             resized etc.
