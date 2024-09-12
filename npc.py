@@ -11,6 +11,9 @@ import tkinter as tk
 from dotenv import load_dotenv
 from PIL import ImageTk, Image, ImageDraw
 
+# TODO(josh): Be more consistant with type hints and COMMENT!!
+# TODO(josh): Figure out what to do with 'remember' command.
+
 load_dotenv()   # FIXME(josh): Testing only!
 
 # TODO(josh): Join all these disparate commands into one or two function.
@@ -21,29 +24,40 @@ class Commands(commands.Cog):
         self.bot = bot
         self.tqueue = tqueue
 
-    async def _cmd_handler(self, ctx):
-        img_url = ctx.author.avatar.url
-        author_name = ctx.author.display_name
-        overlay_msg = f"{ author_name } { ctx.command }s."
-
-        print(overlay_msg)
-        self.tqueue.put({
-            "img_url": img_url,
-            "overlay_msg": overlay_msg
-        })
-
     @slash_command(guild_ids = guilds, name = "approve", description = "Express your approval.")
     async def approve(self, ctx):
-        await self._cmd_handler(ctx)
+        img_url = ctx.author.avatar.url
+        author_name = ctx.author.display_name
+
+        self.tqueue.put({
+            "img_url": img_url,
+            "overlay_msg": f"{ author_name } approves."
+        })
+
         await ctx.respond("Thank you for your feedback.")
 
-    @slash_command(guild_ids = guilds, name = "disapprove", description = "Express your approval.")
+    @slash_command(guild_ids = guilds, name = "disapprove", description = "Express your disapproval.")
     async def disapprove(self, ctx):
-        await self._cmd_handler(ctx)
+        img_url = ctx.author.avatar.url
+        author_name = ctx.author.display_name
+
+        self.tqueue.put({
+            "img_url": img_url,
+            "overlay_msg": f"{ author_name } disapproves." 
+        })
+
         await ctx.respond("Thank you for your feedback.")
 
     @slash_command(guild_ids = guilds, name = "remember", description = "You will remember this.")
     async def remember(self, ctx):
+        img_url = ctx.author.avatar.url
+        author_name = ctx.author.display_name
+
+        self.tqueue.put({
+            "img_url": img_url,
+            "overlay_msg": f"{ author_name } will remember that." 
+        })
+
         await ctx.respond("Thank you for your feedback.")
 
 class WebImage:
@@ -103,8 +117,6 @@ class Overlay:
         else:
             self.root.attributes("-alpha", 0)
 
-        return
-
     def _update(self, overlay_msg: str, img):
         self.label.configure(
             image = img,
@@ -132,10 +144,6 @@ class Overlay:
         self.root.after(0, self._loop)
         self.root.mainloop()
 
-
-def main(bot: discord.Bot, token: str):
-    bot.run(token)
-
 if __name__ == "__main__":
     token = os.environ.get("token")
 
@@ -145,9 +153,7 @@ if __name__ == "__main__":
     bot.add_cog(Commands(bot, tqueue))
 
     overlay = Overlay(tqueue, 512, 64, y=96, padding=64)
-    bot_thread = threading.Thread(target=main, args=(bot, token), daemon=True)
+    bot_thread = threading.Thread(target=bot.run, args=(token,), daemon=True)
     bot_thread.start()
-
-    # bot.run(token)
 
     overlay.run()
